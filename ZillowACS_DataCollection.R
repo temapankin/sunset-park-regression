@@ -86,7 +86,7 @@ sum(is.na(zillow_clean$rent_zori))
 # sum(is.na(zillow_clean$rent_zori))
 
 # Uploading the ACS data using API
-census_api_key("4a886444c4703abdc2217207ea3acbca8fc9976e",  install = TRUE, overwrite = TRUE)
+census_api_key("API_KEY",  install = TRUE, overwrite = TRUE)
 readRenviron("~/.Renviron")
 
 zips <- c("11220", "11232", # Sunset Park
@@ -148,7 +148,7 @@ panel_data <- zillow_clean %>%
 str(panel_data)
 
 # Get CPI data using API
-cpi_series <- bls_api("CUUR0000SA0", startyear = 2019, endyear = 2025, registrationKey = "9b15092b9dd848e08113bafe2ad47e21")
+cpi_series <- bls_api("CUUR0000SA0", startyear = 2019, endyear = 2025, registrationKey = "API_KEY")
 names(cpi_series)
 
 cpi_clean <- cpi_series %>%
