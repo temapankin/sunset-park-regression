@@ -18,7 +18,8 @@ packages <- c(
   "zoo",         # Time-series data
   "dplyr",       # DataFrames
   "ggplot2",     # Vizualization
-  "Hmisc"        # Vizualization
+  "Hmisc",        # Vizualization
+  "blscrapeR"    # Inflation data 
 )
 
 # Install missing packages
@@ -54,13 +55,13 @@ zillow_long <- zillow_raw %>%
     treatmentpost = treatment*post
   ) %>% 
   filter(
-    zip_code %in% c("11220", "11232", "11237", "11221"), # Filter to only have treatment and control neighborhoods
+    zip_code %in% c("11220", "11232", "11237", "11221", "11211", "11222"), # Filter to only have treatment and control neighborhoods
     date >= ymd("2018-01-01") #Filter for the period of interest
   )
 
 # Select required columns
 zillow_clean <- zillow_long %>%
-  select(zip_code, date, rent_zori, treatment, post, treatmentpost)
+  dplyr::select(zip_code, date, rent_zori, treatment, post, treatmentpost)
 
 # Check for the missing values
 sum(is.na(zillow_clean$rent_zori))
@@ -85,20 +86,29 @@ sum(is.na(zillow_clean$rent_zori))
 # sum(is.na(zillow_clean$rent_zori))
 
 # Uploading the ACS data using API
-census_api_key("APIKEY",  install = TRUE, overwrite = TRUE)
+census_api_key("4a886444c4703abdc2217207ea3acbca8fc9976e",  install = TRUE, overwrite = TRUE)
 readRenviron("~/.Renviron")
 
-zips <- c("11220", "11232", "11237", "11221")
+zips <- c("11220", "11232", # Sunset Park
+          "11237", "11221", # Bushwick 
+          "11211", "11222" # Greenpoint
+        )
 
+# Defining variables
 vars <- c(
-  median_income = "B19013_001",    # Median household income
-  renters = "B25003_003",          # Renter-occupied units
-  housing_units = "B25003_001",    # Total housing units
-  total_pop = "B01003_001",        # Total population
-  white = "B02001_002",            # White Pop
-  black = "B02001_003",            # Black Pop
-  asian = "B02001_005",            # Asian Pop
-  hispanic = "B03003_003"          # Hispanic Pop
+  median_income = "B19013_001",       # Median household income
+  renters = "B25003_003",             # Renter-occupied units
+  housing_units = "B25003_001",       # Total housing units
+  total_pop = "B01003_001",           # Total population
+  white = "B02001_002",               # White population
+  black = "B02001_003",               # Black population
+  asian = "B02001_005",               # Asian population
+  hispanic = "B03003_003",            # Hispanic population
+  vacant_units = "B25002_003",        # Vacant housing units
+  total_units = "B25002_001",         # Total housing units (again, for vacancy calc)
+  median_year_built = "B25035_001",   # Median year structure built
+  unemployed = "B23025_005",          # Unemployed civilians
+  labor_force = "B23025_003"          # Civilian labor force
 )
 
 # Get data
@@ -123,9 +133,13 @@ acs_clean <- acs_data %>%
     pct_white = whiteE / total_popE,
     pct_black = blackE / total_popE,
     pct_asian = asianE / total_popE,
-    pct_hispanic = hispanicE / total_popE
+    pct_hispanic = hispanicE / total_popE,
+    vacancy_rate = vacant_unitsE / total_unitsE, 
+    median_year_built = median_year_builtE,
+    unemployment_rate = unemployedE / labor_forceE
   ) %>%
-  select(zip_code, median_income,pct_renters,total_pop, pct_white, pct_black, pct_asian, pct_hispanic)
+  dplyr::select(zip_code, median_income,pct_renters,total_pop, pct_white, pct_black, 
+          pct_asian, pct_hispanic, vacancy_rate, median_year_built, unemployment_rate)
 
 # Join to the rent data to create a panel df 
 panel_data <- zillow_clean %>%
@@ -133,10 +147,29 @@ panel_data <- zillow_clean %>%
 
 str(panel_data)
 
+# Get CPI data using API
+cpi_series <- bls_api("CUUR0000SA0", startyear = 2019, endyear = 2025, registrationKey = "9b15092b9dd848e08113bafe2ad47e21")
+names(cpi_series)
+
+cpi_clean <- cpi_series %>%
+  filter(grepl("M\\d{2}", period)) %>%  
+  mutate(
+    month = as.integer(sub("M", "", period)), 
+    date = as.Date(paste(year, month, "01", sep = "-")),
+    date = ceiling_date(date, "month") - days(1),
+    cpi = as.numeric(value)
+  ) %>%
+  dplyr::select(date, cpi) %>%
+  arrange(date)
+
+panel_data <- panel_data %>%
+  left_join(cpi_clean, by = "date") %>%
+  mutate(
+    rent_real = rent_zori / cpi * 100)
 
 # Filter only numeric columns
 numeric_data <- panel_data %>%
-  select(where(is.numeric)) %>%
+  dplyr::select(where(is.numeric)) %>%
   pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
 
 # Plot
@@ -156,3 +189,8 @@ ggplot(panel_data, aes(x = as.Date(date), y = rent_zori, color = factor(zip_code
     y = "Rent in $ (ZORI)",
     color = "ZIP Code"
   )
+
+# Export data
+saveRDS(panel_data, file = "panel_data.rds")
+write.csv(panel_data, "panel_data.csv")
+
