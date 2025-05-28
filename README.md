@@ -9,8 +9,8 @@ The full paper detailing the research design, data collection, analysis, and res
 ## 🗂 Repository Structure
 
 ```
-├── data/                   # Raw and processed datasets (ZORI)
-├── code/                   # Scripts for data retrieval (ASC,Census API), cleaning, and modeling
+├── data/                   # Raw and processed datasets
+├── code/                   # Scripts for data retrieval (ASC, CPI), cleaning, and modeling
 ├── other_assignments/      # Additional class assignments for GTECH 38520
 ├── FinalPaper.pdf          # Final paper (PDF)
 └── README.md               # This file
@@ -20,6 +20,6 @@ The full paper detailing the research design, data collection, analysis, and res
 
 In addition to the regression project, you will find other class assignments in the `other_assignments/` folder, including homeworks on spatial analysis and data science in R. 
 
----
+
 
 *Created by Artem Pankin (Hunter College, Spring 2025)*
